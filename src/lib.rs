@@ -20,7 +20,8 @@
 //! ```
 
 #![no_std]
-use embedded_hal::blocking::{delay::DelayMs, i2c::{Write, WriteRead}};
+use embedded_hal::i2c::{I2c, ErrorType};
+use embedded_hal::delay::DelayUs;
 use bitfield::bitfield;
 
 pub struct Driver<I2C> {
@@ -36,11 +37,11 @@ impl<E> From<E> for Error<E> {
     }
 }
 
-impl<I2C, I2cError> Driver<I2C>
+impl<I2C> Driver<I2C>
 where
-    I2C: WriteRead<Error = I2cError> + Write<Error = I2cError>
+    I2C: I2c + ErrorType
 {
-    pub fn new(i2c: I2C) -> Result<Driver<I2C>, Error<I2cError>> {
+    pub fn new(i2c: I2C) -> Result<Driver<I2C>, Error<I2C::Error>> {
         let mut driver = Driver {
             i2c,
             integration_time: IntegrationTimes::_200MS,
@@ -53,7 +54,7 @@ where
         Ok(driver)
     }
 
-    pub fn new_define_integration(i2c: I2C, integration_time: IntegrationTimes, gain: Gain) -> Result<Driver<I2C>, Error<I2cError>> {
+    pub fn new_define_integration(i2c: I2C, integration_time: IntegrationTimes, gain: Gain) -> Result<Driver<I2C>, Error<I2C::Error>> {
         let mut driver = Driver {
             i2c,
             integration_time,
@@ -67,13 +68,13 @@ where
         Ok(driver)
     }
 
-    fn get_id(&mut self) -> Result<u8, Error<I2cError>> {
+    fn get_id(&mut self) -> Result<u8, Error<I2C::Error>> {
         let mut buffer = [0u8; 1];
         self.i2c.write_read(chip::I2C, &[chip::COMMAND_BIT | chip::ID_ADDR], &mut buffer)?;
         Ok(buffer[0])
     }
 
-    pub fn set_gain(&mut self, gain: Option<Gain>) -> Result<(), Error<I2cError>> {
+    pub fn set_gain(&mut self, gain: Option<Gain>) -> Result<(), Error<I2C::Error>> {
         if let Some(gain) = gain {
             self.i2c.write(0x29, &[chip::COMMAND_BIT | chip::CONTROL, self.integration_time as u8 | gain as u8])?;
         } else {
@@ -82,7 +83,7 @@ where
         Ok(())
     }
 
-    pub fn set_timing(&mut self, integration_time: Option<IntegrationTimes>) -> Result<(), Error<I2cError>> {
+    pub fn set_timing(&mut self, integration_time: Option<IntegrationTimes>) -> Result<(), Error<I2C::Error>> {
         if let Some(integration_time) = integration_time {
             self.i2c.write(0x29, &[chip::COMMAND_BIT | chip::CONTROL, integration_time as u8| self.gain as u8])?;
         } else {
@@ -91,31 +92,31 @@ where
         Ok(())
     }
 
-    pub fn disable(&mut self) -> Result<(), Error<I2cError>> {
+    pub fn disable(&mut self) -> Result<(), Error<I2C::Error>> {
         self.i2c.write(0x29, &[chip::COMMAND_BIT | chip::ENABLE, chip::ENABLE_POWEROFF])?;
         Ok(())
     }
 
-    pub fn enable(&mut self) -> Result<(), Error<I2cError>> {
+    pub fn enable(&mut self) -> Result<(), Error<I2C::Error>> {
         self.i2c.write(0x29, &[chip::COMMAND_BIT | chip::ENABLE,
             chip::ENABLE_POWERON | chip::ENABLE_AEN | chip::ENABLE_AIEN | chip::ENABLE_NPIEN])?;
         Ok(())
     }
 
-    pub fn get_enable(&mut self) -> Result<Enable, Error<I2cError>> {
+    pub fn get_enable(&mut self) -> Result<Enable, Error<I2C::Error>> {
         let mut status = [0u8; 1];
         self.i2c.write_read(chip::I2C, &[chip::COMMAND_BIT | chip::ENABLE], &mut status)?;
         Ok(Enable(status[0]))
     }
 
-    pub fn get_status(&mut self) -> Result<Status, Error<I2cError>> {
+    pub fn get_status(&mut self) -> Result<Status, Error<I2C::Error>> {
         let mut status = [0u8; 1];
         self.i2c.write_read(chip::I2C, &[chip::COMMAND_BIT | chip::STATUS], &mut status)?;
         Ok(Status(status[0]))
     }
 
 
-    pub fn get_channel_data<D: DelayMs<u8>>(&mut self, delay: &mut D) -> Result<(u16, u16), Error<I2cError>> {
+    pub fn get_channel_data<D: DelayUs>(&mut self, delay: &mut D) -> Result<(u16, u16), Error<I2C::Error>> {
         delay.delay_ms(120);
         let mut buffer_1 = [0u8; 2];
         let mut buffer_2 = [0u8; 2];
@@ -126,7 +127,7 @@ where
         Ok((channel_0, channel_1))
     }
 
-    pub fn get_luminosity<D: DelayMs<u8>>(&mut self, mode: Mode, delay: &mut D) -> Result<u16, Error<I2cError>> {
+    pub fn get_luminosity<D: DelayUs>(&mut self, mode: Mode, delay: &mut D) -> Result<u16, Error<I2C::Error>> {
         let (channel_0, channel_1) = self.get_channel_data(delay)?;
         let full_luminosity: u32 = ((channel_1 as u32) << 16 ) | channel_0 as u32;
 
@@ -181,7 +182,7 @@ where
         }
     }
 
-    pub fn calculate_lux(&mut self, ch_0: u16, ch_1: u16) -> Result<f32, Error<I2cError>> {
+    pub fn calculate_lux(&mut self, ch_0: u16, ch_1: u16) -> Result<f32, Error<I2C::Error>> {
         if (ch_0 == 0xFFFF) | (ch_1 == 0xFFFF) {
             // Signal an overflow
             return Err(Error::SignalOverflow());
