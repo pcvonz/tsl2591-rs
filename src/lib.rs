@@ -8,8 +8,6 @@
 //! # Example
 //! ```
 //! t.enable().unwrap();
-//! t.set_timing(None).unwrap();
-//! t.set_gain(None).unwrap();
 //! loop {
 //!     let (ch_0, ch_1) = t.get_channel_data(&mut delay).unwrap();
 //!     let test = t.calculate_lux(ch_0, ch_1).unwrap();
@@ -44,12 +42,16 @@ where
         let mut driver = Driver {
             i2c,
             integration_time: IntegrationTimes::_200MS,
-            gain: Gain::LOW,
+            gain: Gain::MED,
         };
         let id = driver.get_id()?;
         if id != chip::ID {
             return Err(Error::IdMismatch(id));
         }
+
+        driver.set_gain(driver.gain)?;
+        driver.set_timing(driver.integration_time)?;
+
         Ok(driver)
     }
 
@@ -67,6 +69,10 @@ where
         if id != chip::ID {
             return Err(Error::IdMismatch(id));
         }
+
+        driver.set_gain(gain)?;
+        driver.set_timing(integration_time)?;
+
         Ok(driver)
     }
 
@@ -77,48 +83,32 @@ where
         Ok(buffer[0])
     }
 
-    pub fn set_gain(&mut self, gain: Option<Gain>) -> Result<(), Error<I2C::Error>> {
-        if let Some(gain) = gain {
-            self.i2c.write(
-                0x29,
-                &[
-                    chip::COMMAND_BIT | chip::CONTROL,
-                    self.integration_time as u8 | gain as u8,
-                ],
-            )?;
-        } else {
-            self.i2c.write(
-                0x29,
-                &[
-                    chip::COMMAND_BIT | chip::CONTROL,
-                    self.integration_time as u8 | self.gain as u8,
-                ],
-            )?;
-        }
+    pub fn set_gain(&mut self, gain: Gain) -> Result<(), Error<I2C::Error>> {
+        self.i2c.write(
+            0x29,
+            &[
+                chip::COMMAND_BIT | chip::CONTROL,
+                self.integration_time as u8 | gain as u8,
+            ],
+        )?;
+        self.gain = gain;
+
         Ok(())
     }
 
     pub fn set_timing(
         &mut self,
-        integration_time: Option<IntegrationTimes>,
+        integration_time: IntegrationTimes,
     ) -> Result<(), Error<I2C::Error>> {
-        if let Some(integration_time) = integration_time {
-            self.i2c.write(
-                0x29,
-                &[
-                    chip::COMMAND_BIT | chip::CONTROL,
-                    integration_time as u8 | self.gain as u8,
-                ],
-            )?;
-        } else {
-            self.i2c.write(
-                0x29,
-                &[
-                    chip::COMMAND_BIT | chip::CONTROL,
-                    self.integration_time as u8 | self.gain as u8,
-                ],
-            )?;
-        }
+        self.i2c.write(
+            0x29,
+            &[
+                chip::COMMAND_BIT | chip::CONTROL,
+                integration_time as u8 | self.gain as u8,
+            ],
+        )?;
+        self.integration_time = integration_time;
+
         Ok(())
     }
 
