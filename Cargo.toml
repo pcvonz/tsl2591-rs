@@ -3,7 +3,7 @@ name = "tsl2591"
 description = "embedded hal driver for the TSL2591"
 homepage = "https://github.com/pcvonz/tsl2591-rs"
 version = "0.2.0"
-authors = ["Paul <pcvonz@gmail.com>"]
+authors = ["Paul <pcvonz@gmail.com>", "Xabier Crespo <x.crespo@scrobotics.es>"]
 edition = "2018"
 repository = "https://github.com/pcvonz/tsl2591-rs"
 license = "MIT OR Apache-2.0"
@@ -11,5 +11,5 @@ keywords = ["embedded-hal"]
 categories = ["embedded"]
 
 [dependencies]
-embedded-hal = "1.0.0-alpha.9"
-bitfield = "0.13.2"
+embedded-hal = "1.0.0-alpha.10"
+bitfield = "0.14.0"
