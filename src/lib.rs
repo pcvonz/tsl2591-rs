@@ -13,7 +13,6 @@
 //!     let test = t.calculate_lux(ch_0, ch_1).unwrap();
 //!                                                                 
 //!     iprintln!(&mut cp.ITM.stim[0], "{}", test);
-//!                                                                 
 //! }
 //! ```
 
@@ -211,7 +210,12 @@ where
     }
 
     pub fn calculate_lux(&mut self, ch_0: u16, ch_1: u16) -> Result<f32, Error<I2C::Error>> {
-        if (ch_0 == 0xFFFF) | (ch_1 == 0xFFFF) {
+        let max_count = match self.integration_time {
+            IntegrationTimes::_100MS => 0x8FFF,
+            _ => 0xFFFF,
+        };
+
+        if (ch_0 == max_count) | (ch_1 == max_count) {
             // Signal an overflow
             return Err(Error::SignalOverflow());
         }
